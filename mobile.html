@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>에어하킹 모바일 | Air Hacking Mobile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        :root {
+            --color-red: #ff003c;
+            --color-blue: #00a2ff;
+            --font-main: 'Noto Sans KR', sans-serif;
+        }
+
+        body {
+            background-color: #0c0d14;
+            color: #fff;
+            font-family: var(--font-main);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 6px 0;
+        }
+
+        /* 좌우 상단 작은 버튼 (🏠 / 🖥️) */
+        .edge-btn {
+            position: fixed;
+            top: 10px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            background: rgba(15, 17, 35, 0.85);
+            color: #fff;
+            font-size: 19px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 3000; /* 오버레이보다 위 — 첫화면에서도 항상 보이게 */
+        }
+
+        .edge-btn:active { transform: scale(0.9); opacity: 0.7; }
+        .left-top { left: 10px; }
+        .right-top { right: 10px; }
+
+        /* 슬림 HUD */
+        .hud {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            width: 96%;
+            max-width: 700px;
+            padding: 5px 14px;
+            background: #141622;
+            border: 2px solid #2e3248;
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+
+        .hud-label { font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+        .red-hud  { justify-self: start; color: var(--color-red); }
+        .blue-hud { justify-self: end; color: var(--color-blue); }
+
+        .hud-info {
+            font-size: 15px;
+            color: #8b9bb4;
+            letter-spacing: 1px;
+        }
+
+        .hud-label small,
+        .hud-info small {
+            font-size: 0.9em;
+            font-weight: 900;
+            opacity: 1;
+        }
+
+        /* 게임판: 세로 2:3 비율 */
+        .board-wrapper {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .board-box {
+            background: #000;
+            border: 3px solid #2b2e3c;
+            border-radius: 12px;
+            overflow: hidden;
+            transform-origin: center center; /* 가로 화면일 때 90° 회전 */
+        }
+
+        canvas {
+            background-color: #0b0d1b;
+            display: block;
+            cursor: crosshair;
+            /* 크기는 JS(layoutCanvas)가 화면 방향에 맞춰 결정 */
+        }
+
+        /* 오버레이 (시작 메뉴) */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 7, 20, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(8px);
+        }
+
+        .menu-box {
+            background:
+                radial-gradient(circle at 12% 8%, rgba(255, 92, 138, 0.14), transparent 45%),
+                radial-gradient(circle at 88% 92%, rgba(56, 189, 248, 0.16), transparent 45%),
+                linear-gradient(160deg, #191c38 0%, #12142e 55%, #1b1442 100%);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            padding: 18px 26px 20px;
+            border-radius: 24px;
+            text-align: center;
+            max-width: 560px;
+            width: 94%;
+            max-height: 96vh;
+            overflow-y: auto;
+            box-shadow:
+                0 0 50px rgba(0, 162, 255, 0.18),
+                0 0 100px rgba(255, 0, 60, 0.10),
+                inset 0 0 40px rgba(255, 255, 255, 0.03);
+        }
+
+        /* 전자칠판용 / 스마트폰·패드용 선택 탭 */
+        .edition-switch {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .edition-btn {
+            text-decoration: none;
+            font-family: var(--font-main);
+            font-size: 13px;
+            font-weight: 700;
+            color: #8b9bb4;
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            padding: 5px 14px;
+            transition: all 0.15s ease;
+        }
+
+        .edition-btn small { font-size: 0.6em; opacity: 0.7; }
+
+        .edition-btn:hover {
+            color: #cdd9ec;
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .edition-btn.active {
+            color: #fff;
+            border-color: #7ce7ff;
+            background: linear-gradient(135deg, rgba(124, 231, 255, 0.16), rgba(179, 136, 255, 0.16));
+            box-shadow: 0 0 12px rgba(124, 231, 255, 0.25);
+        }
+
+        .game-title {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 2px;
+            letter-spacing: 1px;
+            background: linear-gradient(92deg, #ff6b9d 5%, #ffc46b 35%, #7ce7ff 70%, #b388ff 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: title-float 3s ease-in-out infinite;
+        }
+
+        @keyframes title-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .game-title small {
+            display: inline;
+            font-size: 15px;
+            color: #9fb0d0;
+            -webkit-text-fill-color: #9fb0d0;
+            letter-spacing: 3px;
+        }
+
+        .game-subtitle {
+            font-size: 16px;
+            font-weight: 700;
+            color: #7ce7ff;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .game-subtitle small {
+            font-size: 12px;
+            opacity: 0.75;
+            letter-spacing: 1px;
+            margin-left: 5px;
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            margin-bottom: 12px;
+            text-align: left;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .option-group label {
+            font-size: 14px;
+            font-weight: 700;
+            color: #aab8d8;
+            letter-spacing: 1px;
+        }
+
+        .option-group label small { font-size: 0.6em; opacity: 0.7; }
+
+        .radio-btn-group { display: flex; gap: 9px; }
+
+        .option-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            color: #c3d0e6;
+            padding: 7px 8px;
+            font-family: var(--font-main);
+            font-size: 15px;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .option-btn small { font-size: 0.6em; opacity: 0.7; }
+
+        .option-btn.active {
+            background: linear-gradient(135deg, rgba(124, 231, 255, 0.16), rgba(179, 136, 255, 0.16));
+            border-color: #7ce7ff;
+            color: #fff;
+            box-shadow: 0 0 14px rgba(124, 231, 255, 0.3);
+        }
+
+        .start-btn {
+            width: 100%;
+            background: linear-gradient(92deg, #ff6b9d, #b388ff 55%, #38bdf8);
+            color: #fff;
+            border: none;
+            padding: 11px 18px;
+            font-family: var(--font-main);
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border-radius: 999px;
+            cursor: pointer;
+            box-shadow: 0 6px 24px rgba(179, 136, 255, 0.35);
+            transition: all 0.15s ease;
+            margin-top: 4px;
+        }
+
+        .start-btn small { font-size: 0.6em; opacity: 0.7; }
+
+        .start-btn:active {
+            transform: translateY(2px) scale(0.99);
+            box-shadow: 0 2px 10px rgba(179, 136, 255, 0.3);
+        }
+
+        .secondary-btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            box-shadow: none;
+        }
+
+        .more-games-btn {
+            background: transparent;
+            color: #ffc46b;
+            border: 2px solid rgba(255, 196, 107, 0.55);
+            box-shadow: none;
+            font-size: 16px;
+            padding: 8px 18px;
+            margin-top: 8px;
+        }
+
+        /* 게임 오버: 승/패는 보드 위 캔버스에 그려지고 이건 하단 버튼 바 */
+        #gameover-overlay {
+            background: none;
+            backdrop-filter: none;
+            pointer-events: none;
+            align-items: flex-end;
+            padding-bottom: 18px;
+        }
+
+        .gameover-box {
+            pointer-events: auto;
+            background: rgba(15, 17, 38, 0.94);
+            border: 2px solid rgba(255, 255, 255, 0.22);
+            border-radius: 999px;
+            padding: 10px 16px;
+            width: auto;
+            max-width: none;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+        }
+
+        .gameover-actions { display: flex; flex-direction: row; gap: 10px; }
+
+        .gameover-actions .start-btn {
+            width: auto;
+            margin-top: 0;
+            padding: 10px 24px;
+            font-size: 16px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <button id="btn-home" class="edge-btn left-top" title="첫 화면으로 Home" aria-label="Home">🏠</button>
+    <button id="btn-fullscreen" class="edge-btn right-top" title="전체화면 토글 Fullscreen" aria-label="Fullscreen">🖥️</button>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="hidden">
+        <div class="hud">
+            <div class="hud-label red-hud">레드 <small>RED</small></div>
+            <div id="hud-match-info" class="hud-info">모드 <small>MODE</small> 1:1 | 목표 <small>GOAL</small> 3점 | 속도 <small>SPEED</small> 느림</div>
+            <div class="hud-label blue-hud">블루 <small>BLUE</small></div>
+        </div>
+
+        <div class="board-wrapper">
+            <div class="board-box">
+                <canvas id="canvas" width="600" height="900"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Menu Overlay -->
+    <div id="menu-overlay" class="overlay">
+        <div class="menu-box">
+            <div class="edition-switch">
+                <a href="index.html" class="edition-btn">📺 전자칠판용 <small>BOARD</small></a>
+                <a href="mobile.html" class="edition-btn active">📱 스마트폰·패드용 <small>MOBILE</small></a>
+            </div>
+            <h1 class="game-title">🏒 에어하킹 ✨ <small>AIR HACKING</small></h1>
+            <h2 class="game-subtitle">모바일 · 패드 전용 <small>MOBILE & TABLET EDITION</small></h2>
+
+            <div class="options-container">
+                <div class="option-group">
+                    <label>플레이 인원 <small>PLAYERS</small></label>
+                    <div class="radio-btn-group" id="opt-players">
+                        <button type="button" class="option-btn active" data-value="1">1 : 1</button>
+                        <button type="button" class="option-btn" data-value="2">2 : 2</button>
+                        <button type="button" class="option-btn" data-value="3">3 : 3</button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <label>목표 점수 <small>WIN LIMIT</small></label>
+                    <div class="radio-btn-group" id="opt-score">
+                        <button type="button" class="option-btn" data-value="1">1점 <small>1 pt</small></button>
+                        <button type="button" class="option-btn" data-value="2">2점 <small>2 pts</small></button>
+                        <button type="button" class="option-btn active" data-value="3">3점 <small>3 pts</small></button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <label>퍽 속도 <small>PUCK SPEED</small></label>
+                    <div class="radio-btn-group" id="opt-speed">
+                        <button type="button" class="option-btn active" data-value="slow">느림 <small>Slow</small></button>
+                        <button type="button" class="option-btn" data-value="normal">보통 <small>Normal</small></button>
+                        <button type="button" class="option-btn" data-value="fast">빠름 <small>Fast</small></button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <label>아이템 <small>ITEMS</small></label>
+                    <div class="radio-btn-group" id="opt-items">
+                        <button type="button" class="option-btn active" data-value="on">켜기 <small>ON</small></button>
+                        <button type="button" class="option-btn" data-value="off">끄기 <small>OFF</small></button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btn-start" class="start-btn">🎮 게임 시작 <small>GAME START</small></button>
+            <button id="btn-more-games" class="start-btn more-games-btn">🕹️ 다른 게임 고르기 <small>MORE GAMES</small></button>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameover-overlay" class="overlay hidden">
+        <div class="menu-box gameover-box">
+            <div class="gameover-actions">
+                <button id="btn-restart" class="start-btn">🔄 다시 하기 <small>REPLAY</small></button>
+                <button id="btn-menu" class="start-btn secondary-btn">🏠 메인 메뉴 <small>MAIN MENU</small></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 에어하킹 모바일/패드 모드 - 게임판 하나(세로 2:3), 마주 보고 직접 터치
+         * 레드: 아래쪽 절반 / 블루: 위쪽 절반 (블루 쪽 텍스트는 180° 뒤집어 표시)
+         */
+
+        const BOARD_W = 600;               // 게임판 가로
+        const BOARD_H = 900;               // 게임판 세로 (2:3)
+        const CENTER_X = BOARD_W / 2;
+        const CENTER_Y = BOARD_H / 2;
+
+        // 게임 모드 설정 값
+        let playerMode = 1;
+        let targetScore = 3;
+        let basePuckSpeed = 288;
+        let speedDifficulty = 'slow';
+        let itemsEnabled = true;
+
+        // 퍽 속도 상한 시스템 — 난이도 옵션은 퍽의 "최고 속도"를 결정한다.
+        let maxPuckSpeedCap = 620;
+        const SPEED_RAMP_TIME = 90;
+        let gameElapsed = 0;
+        let currentMaxPuckSpeed = 360;
+
+        function clampPuckSpeed() {
+            const spd = Math.hypot(puck.vx, puck.vy);
+            if (spd > currentMaxPuckSpeed) {
+                puck.vx = (puck.vx / spd) * currentMaxPuckSpeed;
+                puck.vy = (puck.vy / spd) * currentMaxPuckSpeed;
+            }
+        }
+
+        // 점수 상태
+        let scoreRed = 0;
+        let scoreBlue = 0;
+        let isGameOver = false;
+        let isRoundActive = false;
+        let gameWinner = null;
+
+        // 골대 크기 상태 (조금 열린 상태에서 시작, 점점 커진다)
+        const GOAL_BASE_WIDTH = 40;
+        const GOAL_MAX_WIDTH = 465;   // 가로 600 기준 약 77.5%
+        const GOAL_GROWTH_RATE = 5.3; // 초당 골대가 늘어나는 픽셀 수
+        let currentGoalWidth = GOAL_BASE_WIDTH;
+        let timeSinceRoundStart = 0;
+
+        // 종반 규칙: 골대가 완전히 열린 뒤부터 양 팀 말렛이 점점 작아진다
+        let goalFullyOpenTime = 0;
+        let goalFullyOpenAnnounced = false;
+        const ENDGAME_SHRINK_RATE = 0.015;
+        const ENDGAME_SHRINK_MIN = 0.4;
+
+        // 물리 엔진 객체 (Puck)
+        const puck = {
+            x: CENTER_X,
+            y: CENTER_Y,
+            vx: 0,
+            vy: 0,
+            radius: 18,
+            baseRadius: 18,
+            speedMultiplier: 1.0,
+            lastHitBy: null
+        };
+
+        let mallets = [];
+
+        // 아이템 목록
+        let activeItems = [];
+        let itemSpawnTimer = 0;
+        const ITEM_SPAWN_INTERVAL = 8;
+        const ITEM_RADIUS = 24;
+
+        // 팀별 버프 상태 및 남은 시간
+        const buffs = {
+            red: { power: 0, grow: 0, shrink: 0, slow: 0 },
+            blue: { power: 0, grow: 0, shrink: 0, slow: 0 }
+        };
+
+        // 팀 구분 없는 전역 효과 (퍽 스피드업 표시, 장애물, 공 커짐)
+        const globalFx = { puckspeed: 0, obstacle: 0, puckgrow: 0 };
+        const OBSTACLE_WIDTH = BOARD_W * 0.5; // 중앙 가로선 장애물: 폭 50%
+        const OBSTACLE_THICK = 14;
+
+        // 파티클 / 플로팅 텍스트
+        let particles = [];
+        let floatingTexts = [];
+
+        // DOM 요소 참조
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const menuOverlay = document.getElementById('menu-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const gameContainer = document.getElementById('game-container');
+        const matchInfoEl = document.getElementById('hud-match-info');
+
+        const btnHome = document.getElementById('btn-home');
+        const btnFullscreen = document.getElementById('btn-fullscreen');
+        const btnStart = document.getElementById('btn-start');
+        const btnRestart = document.getElementById('btn-restart');
+        const btnMenu = document.getElementById('btn-menu');
+
+        // --- 8비트 사운드 신디사이저 (Web Audio API) ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 같은 효과음 연속 재생("퍽퍽퍽퍽") 방지용 쿨다운
+        const soundLastPlayed = { hit_wall: 0, hit_mallet: 0 };
+        const SOUND_COOLDOWN = 0.07;
+
+        function playSynthSound(type) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+
+            if (type in soundLastPlayed) {
+                if (now - soundLastPlayed[type] < SOUND_COOLDOWN) return;
+                soundLastPlayed[type] = now;
+            }
+
+            try {
+                switch (type) {
+                    case 'hit_wall': {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(220, now);
+                        osc.frequency.exponentialRampToValueAtTime(70, now + 0.1);
+                        gain.gain.setValueAtTime(0.4, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.11);
+
+                        const click = audioCtx.createOscillator();
+                        const clickGain = audioCtx.createGain();
+                        click.type = 'square';
+                        click.frequency.setValueAtTime(600, now);
+                        click.frequency.exponentialRampToValueAtTime(180, now + 0.03);
+                        clickGain.gain.setValueAtTime(0.15, now);
+                        clickGain.gain.linearRampToValueAtTime(0.001, now + 0.03);
+                        click.connect(clickGain);
+                        clickGain.connect(audioCtx.destination);
+                        click.start(now);
+                        click.stop(now + 0.04);
+                        break;
+                    }
+                    case 'hit_mallet': {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(380, now);
+                        osc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
+                        gain.gain.setValueAtTime(0.25, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.07);
+                        break;
+                    }
+                    case 'item': {
+                        const osc1 = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc1.type = 'square';
+                        osc1.frequency.setValueAtTime(523.25, now);
+                        osc1.frequency.setValueAtTime(659.25, now + 0.08);
+                        osc1.frequency.setValueAtTime(783.99, now + 0.16);
+                        osc1.frequency.setValueAtTime(1046.50, now + 0.24);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.linearRampToValueAtTime(0.1, now + 0.24);
+                        gain.gain.linearRampToValueAtTime(0.001, now + 0.35);
+                        osc1.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc1.start(now);
+                        osc1.stop(now + 0.36);
+                        break;
+                    }
+                    case 'score': {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(200, now);
+                        osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.3);
+                        break;
+                    }
+                    case 'game_over': {
+                        const notes = [440, 415.3, 392, 349.2];
+                        notes.forEach((freq, idx) => {
+                            const osc = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+                            gain.gain.setValueAtTime(0.08, now + idx * 0.15);
+                            gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.15 + 0.12);
+                            gain.gain.linearRampToValueAtTime(0.001, now + idx * 0.15 + 0.15);
+                            osc.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc.start(now + idx * 0.15);
+                            osc.stop(now + idx * 0.15 + 0.16);
+                        });
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.warn("사운드 재생 에러:", e);
+            }
+        }
+
+        // --- 게임 초기화 및 준비 ---
+
+        function makeMallet(id, team, fx, fy) {
+            const baseRadius = 34;
+            return {
+                id: id, team: team,
+                x: BOARD_W * fx, y: BOARD_H * fy, vx: 0, vy: 0,
+                radius: baseRadius, baseRadius: baseRadius,
+                homeX: BOARD_W * fx, homeY: BOARD_H * fy, pointerId: null,
+                targetX: BOARD_W * fx, targetY: BOARD_H * fy
+            };
+        }
+
+        function setupMallets() {
+            mallets = [];
+            // 레드: 아래쪽(y 0.85) / 블루: 위쪽(y 0.15)
+            if (playerMode === 1) {
+                mallets.push(makeMallet('red-1', 'red', 0.5, 0.85));
+                mallets.push(makeMallet('blue-1', 'blue', 0.5, 0.15));
+            } else if (playerMode === 2) {
+                mallets.push(makeMallet('red-1', 'red', 0.3, 0.85));
+                mallets.push(makeMallet('red-2', 'red', 0.7, 0.85));
+                mallets.push(makeMallet('blue-1', 'blue', 0.7, 0.15));
+                mallets.push(makeMallet('blue-2', 'blue', 0.3, 0.15));
+            } else {
+                mallets.push(makeMallet('red-1', 'red', 0.22, 0.85));
+                mallets.push(makeMallet('red-2', 'red', 0.5, 0.85));
+                mallets.push(makeMallet('red-3', 'red', 0.78, 0.85));
+                mallets.push(makeMallet('blue-1', 'blue', 0.78, 0.15));
+                mallets.push(makeMallet('blue-2', 'blue', 0.5, 0.15));
+                mallets.push(makeMallet('blue-3', 'blue', 0.22, 0.15));
+            }
+        }
+
+        function resetRound(server = 'random') {
+            isRoundActive = false;
+            currentGoalWidth = GOAL_BASE_WIDTH;
+            timeSinceRoundStart = 0;
+            activeItems = [];
+            itemSpawnTimer = 0;
+
+            for (const team in buffs) {
+                for (const type in buffs[team]) {
+                    buffs[team][type] = 0;
+                }
+            }
+            globalFx.puckspeed = 0;
+            globalFx.obstacle = 0;
+            globalFx.puckgrow = 0;
+            goalFullyOpenTime = 0;
+            goalFullyOpenAnnounced = false;
+
+            mallets.forEach(m => {
+                m.radius = m.baseRadius;
+                m.pointerId = null;
+                m.x = m.homeX;
+                m.y = m.homeY;
+                m.vx = 0;
+                m.vy = 0;
+                m.targetX = m.homeX;
+                m.targetY = m.homeY;
+            });
+
+            puck.x = CENTER_X;
+            puck.radius = puck.baseRadius;
+            puck.speedMultiplier = 1.0;
+            puck.lastHitBy = null;
+
+            if (server === 'random') {
+                server = Math.random() < 0.5 ? 'red' : 'blue';
+            }
+
+            puck.y = (server === 'red') ? BOARD_H * 0.65 : BOARD_H * 0.35;
+            puck.vx = 0;
+            puck.vy = 0;
+
+            setTimeout(() => {
+                if (isGameOver) return;
+                const jitter = (Math.random() - 0.5) * 0.5;
+                puck.vx = Math.sin(jitter) * basePuckSpeed;
+                puck.vy = Math.cos(jitter) * (server === 'red' ? -basePuckSpeed : basePuckSpeed);
+                isRoundActive = true;
+            }, 1200);
+        }
+
+        // --- 파티클 & 텍스트 이펙트 ---
+
+        function createParticleBurst(x, y, color) {
+            for (let i = 0; i < 4; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 80 + Math.random() * 120;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: color,
+                    life: 1.0,
+                    decay: 2.5 + Math.random() * 2.0,
+                    size: 2 + Math.random() * 3
+                });
+            }
+        }
+
+        function showFloatingText(textKo, textEn, x, y, color) {
+            floatingTexts.push({
+                textKo: textKo,
+                textEn: textEn,
+                x: x, y: y,
+                color: color,
+                life: 1.0,
+                decay: 1.2
+            });
+        }
+
+        // --- 아이템 스폰 및 획득 ---
+
+        function spawnItemPair() {
+            if (activeItems.length > 0) return;
+
+            const types = ['power', 'grow', 'shrink', 'slow', 'puckspeed', 'obstacle', 'puckgrow'];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+
+            // 블루팀-레드팀 정가운데(중앙선 위)에만 스폰
+            const margin = 150;
+            const cx = margin + Math.floor(Math.random() * (BOARD_W - margin * 2));
+            const cy = CENTER_Y;
+
+            activeItems.push({ type: randomType, x: cx, y: cy, radius: ITEM_RADIUS });
+            createParticleBurst(cx, cy, '#a855f7');
+        }
+
+        function applyBuff(type, team, itemX, itemY) {
+            const oppTeam = (team === 'red') ? 'blue' : 'red';
+
+            switch (type) {
+                case 'power':
+                    buffs[team].power = 8.0;
+                    break;
+                case 'grow':
+                    buffs[team].grow = 8.0; // 말렛 크기는 매 프레임 재계산됨
+                    break;
+                case 'shrink':
+                    buffs[oppTeam].shrink = 8.0;
+                    break;
+                case 'slow': {
+                    const curSpeed = Math.hypot(puck.vx, puck.vy);
+                    if (curSpeed > 0) {
+                        puck.vx = (puck.vx / curSpeed) * (basePuckSpeed * 0.5);
+                        puck.vy = (puck.vy / curSpeed) * (basePuckSpeed * 0.5);
+                    }
+                    puck.speedMultiplier = 0.6;
+                    buffs[team].slow = 5.0;
+                    break;
+                }
+                case 'puckspeed': {
+                    const sp = Math.hypot(puck.vx, puck.vy);
+                    const boosted = Math.min(maxPuckSpeedCap, Math.max(sp * 1.5, basePuckSpeed * 1.4));
+                    if (sp > 0) {
+                        puck.vx = (puck.vx / sp) * boosted;
+                        puck.vy = (puck.vy / sp) * boosted;
+                    }
+                    globalFx.puckspeed = 4.0;
+                    break;
+                }
+                case 'obstacle':
+                    globalFx.obstacle = 10.0;
+                    break;
+                case 'puckgrow':
+                    globalFx.puckgrow = 8.0;
+                    puck.radius = puck.baseRadius * 1.6;
+                    break;
+            }
+
+            playSynthSound('item');
+        }
+
+        function updateBuffs(dt) {
+            ['red', 'blue'].forEach(team => {
+                if (buffs[team].power > 0) {
+                    buffs[team].power -= dt;
+                    if (buffs[team].power <= 0) buffs[team].power = 0;
+                }
+                if (buffs[team].grow > 0) {
+                    buffs[team].grow -= dt;
+                    if (buffs[team].grow <= 0) buffs[team].grow = 0;
+                }
+                if (buffs[team].shrink > 0) {
+                    buffs[team].shrink -= dt;
+                    if (buffs[team].shrink <= 0) buffs[team].shrink = 0;
+                }
+                if (buffs[team].slow > 0) {
+                    buffs[team].slow -= dt;
+                    if (buffs[team].slow <= 0) {
+                        buffs[team].slow = 0;
+                        if (puck.speedMultiplier < 1.0) puck.speedMultiplier = 1.0;
+                    }
+                }
+            });
+
+            if (globalFx.puckspeed > 0) globalFx.puckspeed = Math.max(0, globalFx.puckspeed - dt);
+            if (globalFx.obstacle > 0) globalFx.obstacle = Math.max(0, globalFx.obstacle - dt);
+            if (globalFx.puckgrow > 0) {
+                globalFx.puckgrow = Math.max(0, globalFx.puckgrow - dt);
+                if (globalFx.puckgrow === 0) puck.radius = puck.baseRadius;
+            }
+        }
+
+        // --- 화면 방향 자동 대응 레이아웃 ---
+        // 세로 화면: 보드를 세로(2:3) 그대로 표시
+        // 가로 화면: 보드를 90° 회전시켜 긴 쪽을 가로로 꽉 채움 (레드=왼쪽, 블루=오른쪽)
+
+        let isLandscape = false;
+        const boardBox = document.querySelector('.board-box');
+        const boardWrapper = document.querySelector('.board-wrapper');
+
+        function layoutCanvas() {
+            const availW = Math.max(100, boardWrapper.clientWidth - 16);
+            const availH = Math.max(100, boardWrapper.clientHeight - 16);
+            isLandscape = availW > availH;
+
+            let cssH; // 보드 논리 세로(900)에 대응하는 CSS 길이
+            if (!isLandscape) {
+                cssH = Math.min(availH, availW * 1.5);
+                boardBox.style.transform = '';
+            } else {
+                // 회전 후 화면상 가로 = cssH, 세로 = cssW 가 되도록 제약
+                cssH = Math.min(availW, availH * 1.5);
+                boardBox.style.transform = 'rotate(90deg)';
+            }
+            const cssW = cssH * (BOARD_W / BOARD_H);
+            canvas.style.width = cssW + 'px';
+            canvas.style.height = cssH + 'px';
+        }
+
+        // --- 터치/마우스 포인터 매핑 (한 캔버스, 절반씩) ---
+
+        // 화면 좌표 → 보드 논리 좌표 (가로 화면이면 90° 회전을 역변환)
+        function getBoardCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (!isLandscape) {
+                return {
+                    cx: (e.clientX - rect.left) * (BOARD_W / rect.width),
+                    cy: (e.clientY - rect.top) * (BOARD_H / rect.height)
+                };
+            }
+            // 90° 회전 상태: 회전된 시각 박스에서 논리 좌표 복원
+            return {
+                cx: ((e.clientY - rect.top) / rect.height) * BOARD_W,
+                cy: ((rect.right - e.clientX) / rect.width) * BOARD_H
+            };
+        }
+
+        function handleCanvasPointer(e) {
+            if (!isRoundActive || isGameOver) return;
+
+            const { cx, cy } = getBoardCoords(e);
+
+            if (e.type === 'pointerdown') {
+                initAudio();
+                // 터치한 절반의 팀에서 가장 가까운 빈 말렛을 배정
+                const team = (cy > CENTER_Y) ? 'red' : 'blue';
+                const freeMallet = mallets
+                    .filter(m => m.team === team && m.pointerId === null)
+                    .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0];
+
+                if (freeMallet) {
+                    freeMallet.pointerId = e.pointerId;
+                    freeMallet.targetX = cx;
+                    freeMallet.targetY = cy;
+                    try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+                }
+            } else if (e.type === 'pointermove') {
+                const mallet = mallets.find(m => m.pointerId === e.pointerId);
+                if (mallet) {
+                    mallet.targetX = cx;
+                    mallet.targetY = cy;
+                }
+            } else if (e.type === 'pointerup' || e.type === 'pointercancel') {
+                const mallet = mallets.find(m => m.pointerId === e.pointerId);
+                if (mallet) {
+                    mallet.pointerId = null;
+                    try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+                }
+            }
+        }
+
+        function initEvents() {
+            canvas.addEventListener('pointerdown', handleCanvasPointer);
+            canvas.addEventListener('pointermove', handleCanvasPointer);
+            canvas.addEventListener('pointerup', handleCanvasPointer);
+            canvas.addEventListener('pointercancel', handleCanvasPointer);
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+        }
+
+        // --- 물리/충돌 루프 (서브스텝: 터널링 방지) ---
+
+        function updatePhysics(dt) {
+            if (!isRoundActive) return;
+
+            timeSinceRoundStart += dt;
+            currentGoalWidth = Math.min(GOAL_MAX_WIDTH, GOAL_BASE_WIDTH + GOAL_GROWTH_RATE * timeSinceRoundStart);
+
+            // 퍽 최고 속도 상한 갱신 — 플레이 시간에 비례해 서서히 상승
+            gameElapsed += dt;
+            const rampStart = basePuckSpeed * 1.25;
+            currentMaxPuckSpeed = rampStart + (maxPuckSpeedCap - rampStart) * Math.min(1, gameElapsed / SPEED_RAMP_TIME);
+
+            // 종반 규칙: 골대가 완전히 열리면 그때부터 양 팀 말렛이 점점 작아진다
+            if (currentGoalWidth >= GOAL_MAX_WIDTH) {
+                goalFullyOpenTime += dt;
+                if (!goalFullyOpenAnnounced) {
+                    goalFullyOpenAnnounced = true;
+                    showFloatingText("🔥 골대 완전 개방!", "GOALS FULLY OPEN!", CENTER_X, CENTER_Y + 150, '#f97316');
+                    showFloatingText("말렛이 점점 작아집니다!", "MALLETS SHRINKING!", CENTER_X, CENTER_Y + 230, '#f97316');
+                }
+            }
+            const endgameShrink = Math.max(ENDGAME_SHRINK_MIN, 1 - ENDGAME_SHRINK_RATE * goalFullyOpenTime);
+
+            // 말렛 반지름 매 프레임 재계산: 기본 × 버프 배율 × 종반 축소 배율
+            mallets.forEach(m => {
+                let scale = 1;
+                if (buffs[m.team].grow > 0) scale *= 1.55;
+                if (buffs[m.team].shrink > 0) scale *= 0.65;
+                m.radius = m.baseRadius * scale * endgameShrink;
+            });
+
+            // 1. 말렛 이동 경로 계산 (프레임 시작 → 목표 지점)
+            mallets.forEach(m => {
+                m.stepFromX = m.x;
+                m.stepFromY = m.y;
+
+                let destX = (m.pointerId !== null) ? m.targetX : m.x;
+                let destY = (m.pointerId !== null) ? m.targetY : m.y;
+
+                destX = Math.max(m.radius, Math.min(BOARD_W - m.radius, destX));
+                if (m.team === 'red') {
+                    destY = Math.max(CENTER_Y + m.radius, Math.min(BOARD_H - m.radius, destY));
+                } else {
+                    destY = Math.max(m.radius, Math.min(CENTER_Y - m.radius, destY));
+                }
+
+                m.stepToX = destX;
+                m.stepToY = destY;
+                m.vx = (destX - m.stepFromX) / dt;
+                m.vy = (destY - m.stepFromY) / dt;
+            });
+
+            // 2. 서브스텝 분할 — 말렛이 퍽보다 빨라도 통과(터널링)하지 못하게
+            puck.speedMultiplier += 0.003 * dt;
+            let maxMove = Math.hypot(puck.vx, puck.vy) * dt;
+            mallets.forEach(m => {
+                maxMove = Math.max(maxMove, Math.hypot(m.stepToX - m.stepFromX, m.stepToY - m.stepFromY));
+            });
+            const steps = Math.max(1, Math.min(20, Math.ceil(maxMove / 16)));
+            const sdt = dt / steps;
+
+            const WALL_W = 15;
+            const HALF_W = Math.ceil(WALL_W / 2);
+            const topY    = HALF_W;
+            const bottomY = BOARD_H - HALF_W;
+
+            for (let s = 1; s <= steps; s++) {
+                const frac = s / steps;
+
+                mallets.forEach(m => {
+                    m.x = m.stepFromX + (m.stepToX - m.stepFromX) * frac;
+                    m.y = m.stepFromY + (m.stepToY - m.stepFromY) * frac;
+                });
+
+                puck.x += puck.vx * sdt;
+                puck.y += puck.vy * sdt;
+
+                // 3. 좌우 벽 충돌
+                if (puck.x - puck.radius < 0) {
+                    puck.x = puck.radius;
+                    puck.vx = -puck.vx * 0.98;
+                    playSynthSound('hit_wall');
+                    createParticleBurst(0, puck.y, '#9333ea');
+                } else if (puck.x + puck.radius > BOARD_W) {
+                    puck.x = BOARD_W - puck.radius;
+                    puck.vx = -puck.vx * 0.98;
+                    playSynthSound('hit_wall');
+                    createParticleBurst(BOARD_W, puck.y, '#9333ea');
+                }
+
+                const goalStart = CENTER_X - currentGoalWidth / 2;
+                const goalEnd = CENTER_X + currentGoalWidth / 2;
+
+                // 상단 골문(블루 골대) 통과 및 벽 충돌
+                if (puck.y - puck.radius <= topY) {
+                    if (currentGoalWidth > 15 && puck.x >= goalStart && puck.x <= goalEnd) {
+                        if (puck.y < -puck.radius) {
+                            handleGoal('red');
+                            return;
+                        }
+                    } else {
+                        puck.y = topY + puck.radius;
+                        puck.vy = -puck.vy * 0.98;
+                        playSynthSound('hit_wall');
+                        createParticleBurst(puck.x, topY, '#9333ea');
+                    }
+                }
+
+                // 하단 골문(레드 골대) 통과 및 벽 충돌
+                if (puck.y + puck.radius >= bottomY) {
+                    if (currentGoalWidth > 15 && puck.x >= goalStart && puck.x <= goalEnd) {
+                        if (puck.y > BOARD_H + puck.radius) {
+                            handleGoal('blue');
+                            return;
+                        }
+                    } else {
+                        puck.y = bottomY - puck.radius;
+                        puck.vy = -puck.vy * 0.98;
+                        playSynthSound('hit_wall');
+                        createParticleBurst(puck.x, bottomY, '#9333ea');
+                    }
+                }
+
+                // 3-1. 중앙 가로선 장애물 충돌
+                if (globalFx.obstacle > 0) {
+                    const obLeft   = CENTER_X - OBSTACLE_WIDTH / 2;
+                    const obRight  = CENTER_X + OBSTACLE_WIDTH / 2;
+                    const obTop    = CENTER_Y - OBSTACLE_THICK / 2;
+                    const obBottom = CENTER_Y + OBSTACLE_THICK / 2;
+
+                    if (puck.x + puck.radius > obLeft && puck.x - puck.radius < obRight &&
+                        puck.y + puck.radius > obTop && puck.y - puck.radius < obBottom) {
+                        if (puck.vy > 0) {
+                            puck.y = obTop - puck.radius;
+                        } else if (puck.vy < 0) {
+                            puck.y = obBottom + puck.radius;
+                        } else {
+                            puck.y = (puck.y < CENTER_Y) ? obTop - puck.radius : obBottom + puck.radius;
+                        }
+                        puck.vy = -puck.vy * 0.98;
+                        playSynthSound('hit_wall');
+                        createParticleBurst(puck.x, CENTER_Y, '#94a3b8');
+                    }
+                }
+
+                // 4. 말렛과 공의 충돌
+                mallets.forEach(m => {
+                    const dx = puck.x - m.x;
+                    const dy = puck.y - m.y;
+                    const dist = Math.hypot(dx, dy) || 0.0001;
+                    const minDist = puck.radius + m.radius;
+
+                    if (dist < minDist) {
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        puck.x = m.x + nx * minDist;
+                        puck.y = m.y + ny * minDist;
+
+                        const rvx = puck.vx - m.vx;
+                        const rvy = puck.vy - m.vy;
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        if (velAlongNormal < 0) {
+                            const restitution = 1.02;
+                            const malletMass = 10;
+                            const puckMass = 1;
+                            const impulseScalar = -(1 + restitution) * velAlongNormal / (1/malletMass + 1/puckMass);
+
+                            puck.vx += (impulseScalar / puckMass) * nx;
+                            puck.vy += (impulseScalar / puckMass) * ny;
+
+                            puck.vx += m.vx * 0.45;
+                            puck.vy += m.vy * 0.45;
+
+                            puck.lastHitBy = m.team;
+
+                            let multiplier = 1.03;
+                            if (buffs[m.team].power > 0) {
+                                multiplier = 1.45;
+                                createParticleBurst(puck.x, puck.y, '#ea580c');
+                            } else {
+                                createParticleBurst(puck.x, puck.y, '#ffffff');
+                            }
+
+                            puck.vx *= multiplier;
+                            puck.vy *= multiplier;
+
+                            // 세게 쳐도 현재 속도 상한을 넘지 못하게 제한
+                            clampPuckSpeed();
+
+                            playSynthSound('hit_mallet');
+                        }
+                    }
+                });
+            }
+
+            // 5. 아이템 획득 — 퍽이 아닌 말렛이 직접 닿아야 획득
+            for (let i = activeItems.length - 1; i >= 0; i--) {
+                const item = activeItems[i];
+                let collected = false;
+                let collectingTeam = null;
+
+                for (let j = 0; j < mallets.length; j++) {
+                    const m = mallets[j];
+                    const distMallet = Math.hypot(m.x - item.x, m.y - item.y);
+                    if (distMallet < m.radius + item.radius) {
+                        collected = true;
+                        collectingTeam = m.team;
+                        break;
+                    }
+                }
+
+                if (collected && collectingTeam) {
+                    applyBuff(item.type, collectingTeam, item.x, item.y);
+                    activeItems = [];
+                    break;
+                }
+            }
+
+            // 아이템 스폰 — 필드에 아이템이 없고 효과도 모두 끝난 뒤에만 카운트다운
+            if (itemsEnabled && activeItems.length === 0 && getActiveEffectList().length === 0) {
+                itemSpawnTimer += dt;
+                if (itemSpawnTimer >= ITEM_SPAWN_INTERVAL) {
+                    itemSpawnTimer = 0;
+                    spawnItemPair();
+                }
+            }
+
+            // 파티클 업데이트
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= p.decay * dt;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // 플로팅 텍스트 업데이트
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const t = floatingTexts[i];
+                t.y -= 30 * dt;
+                t.life -= t.decay * dt;
+                if (t.life <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+        }
+
+        function handleGoal(scoringTeam) {
+            isRoundActive = false;
+            playSynthSound('score');
+
+            if (scoringTeam === 'red') {
+                scoreRed++;
+                showFloatingText("레드팀 득점!", "RED TEAM SCORED!", CENTER_X, BOARD_H * 0.6, '#ff003c');
+            } else {
+                scoreBlue++;
+                showFloatingText("블루팀 득점!", "BLUE TEAM SCORED!", CENTER_X, BOARD_H * 0.6, '#00a2ff');
+            }
+
+            createParticleBurst(CENTER_X, scoringTeam === 'red' ? 20 : BOARD_H - 20, '#ffffff');
+
+            if (scoreRed >= targetScore) {
+                endGame('red');
+            } else if (scoreBlue >= targetScore) {
+                endGame('blue');
+            } else {
+                resetRound(scoringTeam === 'red' ? 'blue' : 'red');
+            }
+        }
+
+        function endGame(winner) {
+            isGameOver = true;
+            isRoundActive = false;
+            gameWinner = winner;
+            playSynthSound('game_over');
+            gameoverOverlay.classList.remove('hidden');
+        }
+
+        // --- 렌더러 ---
+
+        // 텍스트를 지정 좌표에 그리되, flipped=true면 180° 뒤집어 위쪽(블루) 플레이어 기준으로
+        function withOrientation(x, y, flipped, fn) {
+            ctx.save();
+            ctx.translate(x, y);
+            if (flipped) ctx.rotate(Math.PI);
+            fn();
+            ctx.restore();
+        }
+
+        function drawFloatingTextAt(t, x, y, flipped) {
+            withOrientation(x, y, flipped, () => {
+                ctx.globalAlpha = t.life;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.font = '700 24px "Noto Sans KR", sans-serif';
+                const koWidth = ctx.measureText(t.textKo).width;
+                ctx.font = '700 13px "Noto Sans KR", sans-serif';
+                const enWidth = ctx.measureText(t.textEn).width;
+
+                const padX = 14;
+                const padY = 7;
+                const boxW = Math.max(koWidth, enWidth) + padX * 2;
+                const boxH = 24 + 15 + padY * 2;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(-boxW / 2, -boxH / 2, boxW, boxH);
+
+                ctx.strokeStyle = t.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-boxW / 2, -boxH / 2, boxW, boxH);
+
+                ctx.fillStyle = t.color;
+                ctx.font = '700 24px "Noto Sans KR", sans-serif';
+                ctx.fillText(t.textKo, 0, -8);
+                ctx.globalAlpha = t.life * 0.75;
+                ctx.font = '700 13px "Noto Sans KR", sans-serif';
+                ctx.fillText(t.textEn, 0, 13);
+            });
+        }
+
+        function drawBoard() {
+            ctx.strokeStyle = '#3f445b';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0, 0, BOARD_W, BOARD_H);
+
+            // 중앙선 + 센터 서클
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, CENTER_Y);
+            ctx.lineTo(BOARD_W, CENTER_Y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(CENTER_X, CENTER_Y, 90, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(CENTER_X, CENTER_Y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            // 점수 오버레이 — 각 팀 자기 쪽에서 바로 보이게 (블루는 180° 뒤집음)
+            withOrientation(CENTER_X, BOARD_H * 0.72, false, () => {
+                ctx.font = '900 180px "Noto Sans KR", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(255, 40, 90, 0.32)';
+                ctx.fillText(scoreRed, 0, 0);
+            });
+            withOrientation(CENTER_X, BOARD_H * 0.28, true, () => {
+                ctx.font = '900 180px "Noto Sans KR", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(60, 180, 255, 0.32)';
+                ctx.fillText(scoreBlue, 0, 0);
+            });
+
+            // 가변 골대 및 골라인 렌더링
+            const goalStart = CENTER_X - currentGoalWidth / 2;
+            const goalEnd = CENTER_X + currentGoalWidth / 2;
+
+            const WALL_W = 15;
+            const HALF_W = Math.ceil(WALL_W / 2);
+            const topY    = HALF_W;
+            const bottomY = BOARD_H - HALF_W;
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = WALL_W;
+
+            ctx.beginPath();
+            ctx.moveTo(0, topY);
+            ctx.lineTo(goalStart, topY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(goalEnd, topY);
+            ctx.lineTo(BOARD_W, topY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, bottomY);
+            ctx.lineTo(goalStart, bottomY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(goalEnd, bottomY);
+            ctx.lineTo(BOARD_W, bottomY);
+            ctx.stroke();
+
+            if (currentGoalWidth > 0) {
+                ctx.lineWidth = WALL_W;
+                ctx.strokeStyle = '#00a2ff';
+                ctx.beginPath();
+                ctx.moveTo(goalStart, topY);
+                ctx.lineTo(goalEnd, topY);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#ff003c';
+                ctx.beginPath();
+                ctx.moveTo(goalStart, bottomY);
+                ctx.lineTo(goalEnd, bottomY);
+                ctx.stroke();
+            }
+
+            // 중앙 가로선 장애물 (만료 2초 전부터 깜빡임)
+            if (globalFx.obstacle > 0) {
+                ctx.save();
+                if (globalFx.obstacle < 2) {
+                    ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(globalFx.obstacle * Math.PI * 3));
+                }
+                ctx.fillStyle = '#e2e8f0';
+                ctx.fillRect(CENTER_X - OBSTACLE_WIDTH / 2, CENTER_Y - OBSTACLE_THICK / 2, OBSTACLE_WIDTH, OBSTACLE_THICK);
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(CENTER_X - OBSTACLE_WIDTH / 2, CENTER_Y - OBSTACLE_THICK / 2, OBSTACLE_WIDTH, OBSTACLE_THICK);
+                ctx.restore();
+            }
+
+            // 스폰된 아이템 — 박스 없이 큼직한 이모지 (양쪽에서 보이게 두 방향으로)
+            activeItems.forEach(item => {
+                let label = '❔';
+                switch (item.type) {
+                    case 'power': label = '⚡'; break;
+                    case 'grow': label = '🍄'; break;
+                    case 'shrink': label = '🤏'; break;
+                    case 'slow': label = '🐢'; break;
+                    case 'puckspeed': label = '🚀'; break;
+                    case 'obstacle': label = '🧱'; break;
+                    case 'puckgrow': label = '🎈'; break;
+                }
+
+                const scale = 1 + 0.1 * Math.sin(performance.now() / 220);
+                withOrientation(item.x, item.y, false, () => {
+                    ctx.font = `${Math.round(52 * scale)}px "Noto Sans KR", sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, 0, 0);
+                });
+            });
+
+            // 공(Puck) 렌더링
+            const isPuckOnFire = (puck.lastHitBy && buffs[puck.lastHitBy].power > 0);
+            ctx.fillStyle = isPuckOnFire ? '#f97316' : '#ffffff';
+            ctx.beginPath();
+            ctx.arc(puck.x, puck.y, puck.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // 말렛 렌더링
+            mallets.forEach(m => {
+                const isRed = (m.team === 'red');
+                ctx.fillStyle = isRed ? '#ff0000' : '#0066ff';
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3.5;
+                ctx.stroke();
+
+                if (m.pointerId !== null) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.lineWidth = 5;
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.radius * 0.7, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = isRed ? '#ff5c5c' : '#5cb8ff';
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.radius * 0.38, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // 파티클 렌더링
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+            });
+            ctx.globalAlpha = 1.0;
+
+            // 플로팅 텍스트 — 양쪽 플레이어 모두 읽을 수 있게 두 방향으로 표시
+            // (겹치지 않도록 정방향은 50px 아래, 역방향은 대칭 위치에서 50px 위로 분리)
+            floatingTexts.forEach(t => {
+                drawFloatingTextAt(t, t.x, t.y + 50, false);
+                drawFloatingTextAt(t, BOARD_W - t.x, BOARD_H - t.y - 50, true);
+            });
+        }
+
+        // 활성 아이템 효과 목록 (중앙선 오버레이 표시용)
+        function getActiveEffectList() {
+            const fx = [];
+            const push = (ko, en, t, color) => fx.push({ ko, en, t, color });
+
+            if (buffs.red.power > 0)   push('⚡ 레드 파워 업', 'RED POWER', buffs.red.power, '#ff003c');
+            if (buffs.blue.power > 0)  push('⚡ 블루 파워 업', 'BLUE POWER', buffs.blue.power, '#00a2ff');
+            if (buffs.red.grow > 0)    push('🍄 레드 크기 증가', 'RED GROW', buffs.red.grow, '#ff003c');
+            if (buffs.blue.grow > 0)   push('🍄 블루 크기 증가', 'BLUE GROW', buffs.blue.grow, '#00a2ff');
+            if (buffs.red.shrink > 0)  push('🤏 레드 축소', 'RED SHRUNK', buffs.red.shrink, '#d946ef');
+            if (buffs.blue.shrink > 0) push('🤏 블루 축소', 'BLUE SHRUNK', buffs.blue.shrink, '#d946ef');
+            const slowT = Math.max(buffs.red.slow, buffs.blue.slow);
+            if (slowT > 0)             push('🐢 시간 지연', 'SLOW', slowT, '#22c55e');
+            if (globalFx.puckspeed > 0) push('🚀 퍽 스피드 업', 'PUCK SPEED UP', globalFx.puckspeed, '#fbbf24');
+            if (globalFx.obstacle > 0)  push('🧱 장애물', 'OBSTACLE', globalFx.obstacle, '#94a3b8');
+            if (globalFx.puckgrow > 0)  push('🎈 공 커짐', 'BIG PUCK', globalFx.puckgrow, '#f472b6');
+
+            return fx;
+        }
+
+        // 아이템 효과를 중앙선 위(블루 방향, 뒤집힘)/아래(레드 방향)에 오버레이
+        function drawEffectOverlay() {
+            const fx = getActiveEffectList();
+            if (fx.length === 0) return;
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const badgeGap = 8;
+            const padX = 10;
+            const badgeH = 48;
+
+            fx.forEach(f => {
+                ctx.font = '700 18px "Noto Sans KR", sans-serif';
+                const koW = ctx.measureText(f.ko).width;
+                ctx.font = '700 11px "Noto Sans KR", sans-serif';
+                const enW = ctx.measureText(`${f.en} ${f.t.toFixed(1)}s`).width;
+                f.w = Math.max(koW, enW) + padX * 2;
+            });
+
+            const totalW = fx.reduce((sum, f) => sum + f.w, 0) + badgeGap * (fx.length - 1);
+
+            // [행 y좌표, 뒤집기 여부] — 아래(레드용 바로), 위(블루용 뒤집힘)
+            [[CENTER_Y + 70, false], [CENTER_Y - 70, true]].forEach(([rowY, flipped]) => {
+                withOrientation(CENTER_X, rowY, flipped, () => {
+                    let x = -totalW / 2;
+                    fx.forEach(f => {
+                        const cx = x + f.w / 2;
+
+                        ctx.globalAlpha = 0.82;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                        ctx.fillRect(x, -badgeH / 2, f.w, badgeH);
+                        ctx.strokeStyle = f.color;
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x, -badgeH / 2, f.w, badgeH);
+
+                        ctx.globalAlpha = 1.0;
+                        ctx.fillStyle = f.color;
+                        ctx.font = '700 18px "Noto Sans KR", sans-serif';
+                        ctx.fillText(f.ko, cx, -8);
+                        ctx.globalAlpha = 0.75;
+                        ctx.font = '700 11px "Noto Sans KR", sans-serif';
+                        ctx.fillText(`${f.en} ${f.t.toFixed(1)}s`, cx, 11);
+                        ctx.globalAlpha = 1.0;
+
+                        x += f.w + badgeGap;
+                    });
+                });
+            });
+
+            ctx.restore();
+        }
+
+        // 게임 종료: 각 팀의 절반에 자기 기준 방향으로 승/패를 그린다
+        function drawResultOverlay() {
+            ctx.save();
+            ctx.fillStyle = 'rgba(5, 7, 20, 0.68)';
+            ctx.fillRect(0, 0, BOARD_W, BOARD_H);
+
+            const halves = [
+                { winner: gameWinner === 'red', cy: BOARD_H * 0.75, flipped: false },  // 아래(레드)
+                { winner: gameWinner === 'blue', cy: BOARD_H * 0.25, flipped: true }   // 위(블루, 뒤집힘)
+            ];
+
+            halves.forEach(h => {
+                withOrientation(CENTER_X, h.cy, h.flipped, () => {
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    ctx.fillStyle = h.winner ? '#ffd93d' : '#8b9bb4';
+                    ctx.font = '900 90px "Noto Sans KR", sans-serif';
+                    ctx.fillText(h.winner ? '🏆 승리!' : '패배', 0, -55);
+
+                    ctx.globalAlpha = 0.8;
+                    ctx.font = '900 34px "Noto Sans KR", sans-serif';
+                    ctx.fillText(h.winner ? 'YOU WIN!' : 'YOU LOSE', 0, 20);
+
+                    ctx.globalAlpha = 0.9;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '700 26px "Noto Sans KR", sans-serif';
+                    ctx.fillText(`레드 ${scoreRed} : ${scoreBlue} 블루`, 0, 75);
+                    ctx.globalAlpha = 0.6;
+                    ctx.font = '700 15px "Noto Sans KR", sans-serif';
+                    ctx.fillText(`FINAL SCORE  RED ${scoreRed} : ${scoreBlue} BLUE`, 0, 105);
+                });
+            });
+
+            ctx.restore();
+        }
+
+        function render() {
+            ctx.fillStyle = '#0b0d1b';
+            ctx.fillRect(0, 0, BOARD_W, BOARD_H);
+            drawBoard();
+            drawEffectOverlay();
+
+            if (isGameOver && gameWinner) {
+                drawResultOverlay();
+            }
+        }
+
+        let lastTime = performance.now();
+
+        function gameLoop(now) {
+            let dt = (now - lastTime) / 1000.0;
+            lastTime = now;
+            if (dt > 0.1) dt = 0.1;
+
+            updatePhysics(dt);
+            updateBuffs(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- UI 바인딩 및 흐름 제어 ---
+
+        function initOptionGroup(groupId, callback) {
+            const container = document.getElementById(groupId);
+            if (!container) return;
+            const buttons = container.querySelectorAll('.option-btn');
+
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    callback(btn.dataset.value);
+                });
+            });
+        }
+
+        function returnToMenu() {
+            isRoundActive = false;
+            gameContainer.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            menuOverlay.classList.remove('hidden');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn(`전체화면 전환 실패: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initOptionGroup('opt-players', (val) => {
+                playerMode = parseInt(val);
+            });
+
+            initOptionGroup('opt-score', (val) => {
+                targetScore = parseInt(val);
+            });
+
+            initOptionGroup('opt-speed', (val) => {
+                speedDifficulty = val;
+                // 옵션은 퍽의 "최고 속도"를 결정 — 상한은 플레이할수록 이 값까지 상승
+                if (val === 'slow')        { basePuckSpeed = 288; maxPuckSpeedCap = 620; }
+                else if (val === 'normal') { basePuckSpeed = 424; maxPuckSpeedCap = 1010; }
+                else                       { basePuckSpeed = 560; maxPuckSpeedCap = 1400; }
+            });
+
+            initOptionGroup('opt-items', (val) => {
+                itemsEnabled = (val === 'on');
+            });
+
+            btnStart.addEventListener('click', () => {
+                initAudio();
+                scoreRed = 0;
+                scoreBlue = 0;
+                isGameOver = false;
+                gameWinner = null;
+                gameElapsed = 0;
+
+                const speedNames = {
+                    slow:   { ko: '느림', en: 'SLOW' },
+                    normal: { ko: '보통', en: 'NORMAL' },
+                    fast:   { ko: '빠름', en: 'FAST' }
+                };
+                const sn = speedNames[speedDifficulty] || speedNames.slow;
+                matchInfoEl.innerHTML = `모드 <small>MODE</small> ${playerMode}:${playerMode} | 목표 <small>GOAL</small> ${targetScore}점 | 속도 <small>SPEED</small> ${sn.ko} <small>${sn.en}</small>`;
+
+                menuOverlay.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                layoutCanvas(); // 컨테이너가 보이게 된 뒤 실제 크기로 배치
+
+                setupMallets();
+                resetRound('random');
+            });
+
+            btnRestart.addEventListener('click', () => {
+                scoreRed = 0;
+                scoreBlue = 0;
+                isGameOver = false;
+                gameWinner = null;
+                gameElapsed = 0;
+                gameoverOverlay.classList.add('hidden');
+
+                setupMallets();
+                resetRound('random');
+            });
+
+            btnMenu.addEventListener('click', returnToMenu);
+            btnHome.addEventListener('click', returnToMenu);
+            btnFullscreen.addEventListener('click', toggleFullscreen);
+
+            document.getElementById('btn-more-games').addEventListener('click', () => {
+                window.location.href = 'https://킹수학.com';
+            });
+
+            window.addEventListener('touchmove', e => {
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+
+            // 화면 회전/크기 변경 시 보드 방향·크기 재계산
+            window.addEventListener('resize', layoutCanvas);
+            window.addEventListener('orientationchange', () => {
+                setTimeout(layoutCanvas, 150); // 회전 직후 크기 반영 대기
+            });
+
+            layoutCanvas();
+            initEvents();
+            requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>
